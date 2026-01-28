@@ -93,8 +93,8 @@ app.post("/auth/signin", async (req, res) => {
 
 function middlewareAuth(req: Request, res: Response, next: NextFunction) {
     try {
-        let token = req.headers.token! as string;
-        let decoded = jwt.verify(token, `${process.env.JWT_SECRE}`);
+        let token = req.headers.token! as string;""
+        let decoded = jwt.verify(token, process.env.JWT_SECRET!);
         req.user = decoded as UserPayload;
         next();
 
@@ -373,7 +373,7 @@ app.post("/purchases", middlewareAuth, async (req, res) => {
 })
 
 
-app.get("/users/purchases", middlewareAuth, async (req, res) => {
+app.get("/users/:id/purchases", middlewareAuth, async (req, res) => {
     try {
         let purchases = await prisma.purchase.findMany({
             where: {
