@@ -1,19 +1,9 @@
 import express, { type Request, type Response, type NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { UserSignup, UserSignin, CourseSchema, updateCourse } from "./zod";
+import { prisma } from './db'
 const app = express();
 app.use(express.json());
-import { PrismaClient } from "./generated/prisma/client";
-import { PrismaPg } from "@prisma/adapter-pg";
-
-const adapter = new PrismaPg({
-    connectionString: process.env.DATABASE_URL!,
-});
-
-const prisma = new PrismaClient({
-    adapter,
-});
-
 
 declare global {
     namespace Express {
@@ -84,7 +74,8 @@ app.post("/auth/signin", async (req, res) => {
             })
             return;
         }
-        let token = jwt.sign({ id: user.id, role: user.role }, "hjkhjshgljsjjcegljlj")
+        let token = jwt.sign({ id: user.id, role: user.role }, `${process.env.JWT_SECRE}`)
+        console.log(`${process.env.JWT_SECRE}`)
         res.status(200).json({
             message: "login successfull",
             id: user.id,
@@ -103,7 +94,7 @@ app.post("/auth/signin", async (req, res) => {
 function middlewareAuth(req: Request, res: Response, next: NextFunction) {
     try {
         let token = req.headers.token! as string;
-        let decoded = jwt.verify(token, "hjkhjshgljsjjcegljlj");
+        let decoded = jwt.verify(token, `${process.env.JWT_SECRE}`);
         req.user = decoded as UserPayload;
         next();
 
@@ -281,7 +272,123 @@ app.delete("/courses/:id", middlewareAuth, async (req, res) => {
 
 
 
+app.post("/lessons", middlewareAuth, async (req, res) => {
+    try {
+        if (req.user?.role != "INSTRUCTOR") {
+            res.status(403).json({
+                message: "Students has no access"
+            })
+            return;
+        }
+        let { title, content, courseId } = req.body;
+        let course = await prisma.course.findUnique({
+            where: {
+                id: courseId
+            }
+        })
+        if (!course) {
+            res.status(404).json({
+                message: "course doesnot exist"
+            })
+            return;
+        }
+        if (course.instructorId != req.user.id) {
+            res.status(403).json({
+                message: "This course doesnot belongs to you"
+            })
+            return;
+        }
+        let lessons = await prisma.lesson.create({
+            data: {
+                title,
+                content,
+                courseId
+            }
+        })
+        res.status(201).json({
+            lessons
+        })
+        return;
 
+    }
+    catch (e) {
+
+    }
+})
+
+
+
+app.get("/courses/:courseId/lessons", async (req, res) => {
+    try {
+        let course = await prisma.course.findUnique({
+            where: {
+                id: req.params.courseId
+            }
+        })
+        if (!course) {
+            res.status(404).json({
+                message: "course doesnot exist"
+            })
+            return;
+        }
+        let lessons = await prisma.lesson.findMany({
+            where: {
+                courseId: req.params.courseId as string
+            }
+        })
+        res.status(200).json({
+            lessons
+        })
+        return;
+    }
+    catch (e) {
+
+    }
+})
+
+app.post("/purchases", middlewareAuth, async (req, res) => {
+    try {
+        if (req.user?.role == "INSTRUCTOR") {
+            res.status(403).json({
+                message: "No access"
+            })
+            return;
+        }
+        let { courseId } = req.body;
+        let purchases = await prisma.purchase.create({
+            data: {
+                courseId: courseId as string,
+                userId: req.user?.id as string
+            }
+        })
+        res.status(201).json({
+            purchases
+        })
+        return;
+
+    }
+    catch (e) {
+
+    }
+})
+
+
+app.get("/users/purchases", middlewareAuth, async (req, res) => {
+    try {
+        let purchases = await prisma.purchase.findMany({
+            where: {
+                userId: req.user?.id as string
+            }
+        })
+        res.status(200).json({
+            purchases
+        })
+        return;
+    }
+    catch (e) {
+
+    }
+})
 app.listen(3000, () => {
     console.log("running");
 })

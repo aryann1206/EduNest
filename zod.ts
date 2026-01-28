@@ -5,7 +5,7 @@ const UserSignup = z.object({
     email: z.email(),
     password: z.string().min(6),
     name: z.string(),
-    role: z.enum(["STUDENT", "INSTRUCTOR"])
+    role: z.enum(["STUDENT", "INSTRUCTOR"]).optional()
 });
 
 
